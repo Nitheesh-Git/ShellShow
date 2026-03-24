@@ -83,11 +83,9 @@ export default function Terminal() {
           actions.setAssistantEmotion('celebrate');
         }, 500);
       } else if (expected) {
-        // Wrong command - show hint
+        // Wrong command - show hint but allow retry
         actions.setAssistantEmotion('think');
-        setTimeout(() => {
-          actions.showHint();
-        }, 300);
+        actions.showHint();
       }
     }
 
@@ -196,7 +194,7 @@ export default function Terminal() {
       </div>
 
       {/* Terminal Footer - Command hints */}
-      {!freeMode && currentLesson && lessonPhase === 'waiting' && (
+      {!freeMode && currentLesson && currentLesson.expectedCommand && (lessonPhase === 'waiting' || lessonPhase === 'hint') && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

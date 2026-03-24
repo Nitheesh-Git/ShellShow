@@ -11,6 +11,30 @@ import {
   getParentPath,
 } from './fileSystem';
 
+import {
+  createInitialOSState,
+  cloneOSState,
+  forkProcess,
+  execProcess,
+  waitProcess,
+  scheduleProcesses,
+  allocMemory,
+  freeMemory,
+  simulateRaceCondition,
+  enableLock,
+} from './osSimulator';
+
+// Global OS state (managed separately from file system)
+let osState = createInitialOSState();
+
+// Reset OS state
+export const resetOSState = () => {
+  osState = createInitialOSState();
+};
+
+// Get current OS state
+export const getOSState = () => osState;
+
 // Parse command string into command and arguments
 export const parseCommand = (input) => {
   const trimmed = input.trim();
@@ -54,6 +78,7 @@ export const executeCommand = (input, fileSystem, currentPath) => {
   }
 
   switch (command) {
+    // File system commands
     case 'pwd':
       return handlePwd(newFS, currentPath);
 
@@ -91,6 +116,34 @@ export const executeCommand = (input, fileSystem, currentPath) => {
 
     case 'help':
       return handleHelp(newFS, currentPath);
+
+    // OS Process commands
+    case 'fork':
+      return handleFork(newFS, currentPath);
+
+    case 'exec':
+      return handleExec(newFS, currentPath, args);
+
+    case 'wait':
+      return handleWait(newFS, currentPath);
+
+    // CPU Scheduling commands
+    case 'schedule':
+      return handleSchedule(newFS, currentPath, args);
+
+    // Memory commands
+    case 'alloc':
+      return handleAlloc(newFS, currentPath, args);
+
+    case 'free':
+      return handleFree(newFS, currentPath, args);
+
+    // Concurrency commands
+    case 'race':
+      return handleRace(newFS, currentPath, args);
+
+    case 'lock':
+      return handleLock(newFS, currentPath, args);
 
     default:
       return {
@@ -290,7 +343,6 @@ const handleTouch = (fileSystem, currentPath, args) => {
     };
   }
 
-  // Check if file already exists (touch just updates timestamp in real systems)
   const existing = parentDir.children.find(c => c.name === newFileName);
   if (existing) {
     return {
@@ -434,7 +486,6 @@ const handleCp = (fileSystem, currentPath, args) => {
   if (destParent && destParent.type === 'folder') {
     // Copying into a folder
   } else {
-    // Copying to a new name
     destParent = findNode(fileSystem, getParentPath(destPath));
     destName = destPath[destPath.length - 1];
   }
@@ -542,7 +593,6 @@ const handleMv = (fileSystem, currentPath, args) => {
   if (destParent && destParent.type === 'folder') {
     // Moving into a folder
   } else {
-    // Renaming or moving to new location
     destParent = findNode(fileSystem, getParentPath(destPath));
     destName = destPath[destPath.length - 1];
   }
@@ -569,7 +619,6 @@ const handleMv = (fileSystem, currentPath, args) => {
     };
   }
 
-  // Check if destination already exists
   if (destParent.children.some(c => c.name === destName)) {
     return {
       success: false,
@@ -581,10 +630,7 @@ const handleMv = (fileSystem, currentPath, args) => {
     };
   }
 
-  // Remove from source
   sourceParent.children.splice(sourceIndex, 1);
-
-  // Add to destination
   sourceNode.name = destName;
   addChild(destParent, sourceNode);
 
@@ -686,19 +732,285 @@ const handleRm = (fileSystem, currentPath, args) => {
   };
 };
 
+// FORK - Create a new process
+const handleFork = (fileSystem, currentPath) => {
+  const result = forkProcess(osState);
+
+  if (!result.success) {
+    return {
+      success: false,
+      output: '',
+      error: result.error,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  osState = result.osState;
+
+  return {
+    success: true,
+    output: `Forked! Parent PID: ${result.parentPid}, Child PID: ${result.childPid}`,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
+// EXEC - Replace process with new program
+const handleExec = (fileSystem, currentPath, args) => {
+  const programName = args[0] || 'new_program';
+  const result = execProcess(osState, programName);
+
+  if (!result.success) {
+    return {
+      success: false,
+      output: '',
+      error: result.error,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  osState = result.osState;
+
+  return {
+    success: true,
+    output: `Process ${result.animation.pid} now running: ${result.animation.newName}`,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
+// WAIT - Wait for child process
+const handleWait = (fileSystem, currentPath) => {
+  const result = waitProcess(osState);
+
+  if (!result.success) {
+    return {
+      success: false,
+      output: '',
+      error: result.error,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  osState = result.osState;
+
+  const childInfo = result.animation.child
+    ? `Child ${result.animation.child.pid} terminated`
+    : 'Waiting complete';
+
+  return {
+    success: true,
+    output: childInfo,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
+// SCHEDULE - Run CPU scheduling simulation
+const handleSchedule = (fileSystem, currentPath, args) => {
+  const algorithm = args[0] || 'fcfs';
+  const validAlgorithms = ['fcfs', 'sjf', 'srtf'];
+
+  if (!validAlgorithms.includes(algorithm.toLowerCase())) {
+    return {
+      success: false,
+      output: '',
+      error: `Unknown scheduling algorithm: ${algorithm}. Use: fcfs, sjf, or srtf`,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  const result = scheduleProcesses(osState, algorithm);
+
+  if (!result.success) {
+    return {
+      success: false,
+      output: '',
+      error: result.error,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  osState = result.osState;
+
+  const scheduleOutput = result.animation.schedule
+    .map(s => `${s.name}: ${s.start}-${s.end}`)
+    .join(', ');
+
+  return {
+    success: true,
+    output: `${algorithm.toUpperCase()} Schedule: ${scheduleOutput}`,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
+// ALLOC - Allocate memory
+const handleAlloc = (fileSystem, currentPath, args) => {
+  const size = parseInt(args[0]) || 128;
+  const processName = args[1] || 'user';
+
+  const result = allocMemory(osState, size, processName);
+
+  if (!result.success) {
+    return {
+      success: false,
+      output: '',
+      error: result.error,
+      fileSystem,
+      currentPath,
+      animation: result.animation || null,
+    };
+  }
+
+  osState = result.osState;
+
+  return {
+    success: true,
+    output: `Allocated ${size}MB for ${processName}`,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
+// FREE - Free memory
+const handleFree = (fileSystem, currentPath, args) => {
+  const result = freeMemory(osState);
+
+  if (!result.success) {
+    return {
+      success: false,
+      output: '',
+      error: result.error,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  osState = result.osState;
+
+  return {
+    success: true,
+    output: `Freed ${result.animation.freedSize}MB from ${result.animation.freedProcess}`,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
+// RACE - Demonstrate race condition
+const handleRace = (fileSystem, currentPath, args) => {
+  const action = args[0] || 'demo';
+
+  if (action !== 'demo') {
+    return {
+      success: false,
+      output: '',
+      error: `Usage: race demo`,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  const result = simulateRaceCondition(osState);
+  osState = result.osState;
+
+  return {
+    success: true,
+    output: `Race condition! Expected: ${result.animation.expectedValue}, Got: ${result.animation.actualValue}`,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
+// LOCK - Enable synchronization
+const handleLock = (fileSystem, currentPath, args) => {
+  const action = args[0] || 'enable';
+
+  if (action !== 'enable') {
+    return {
+      success: false,
+      output: '',
+      error: `Usage: lock enable`,
+      fileSystem,
+      currentPath,
+      animation: null,
+    };
+  }
+
+  const result = enableLock(osState);
+  osState = result.osState;
+
+  return {
+    success: true,
+    output: `Lock enabled! Final value: ${result.animation.finalValue} (correct!)`,
+    error: null,
+    fileSystem,
+    currentPath,
+    animation: result.animation,
+  };
+};
+
 // HELP - Show available commands
 const handleHelp = (fileSystem, currentPath) => {
   const helpText = `Available commands:
-  pwd          Print working directory
-  ls [path]    List directory contents
-  cd [path]    Change directory
-  mkdir <name> Create a new directory
-  touch <name> Create a new file
-  cp <src> <dest>  Copy file or folder
-  mv <src> <dest>  Move or rename file/folder
-  rm <name>    Remove file (use -r for folders)
-  clear        Clear the terminal
-  help         Show this help message`;
+
+FILE SYSTEM:
+  pwd             Print working directory
+  ls [path]       List directory contents
+  cd [path]       Change directory
+  mkdir <name>    Create a new directory
+  touch <name>    Create a new file
+  cp <src> <dest> Copy file or folder
+  mv <src> <dest> Move or rename file/folder
+  rm <name>       Remove file (use -r for folders)
+
+PROCESS MANAGEMENT:
+  fork            Create a child process
+  exec <program>  Replace process with program
+  wait            Wait for child process
+
+CPU SCHEDULING:
+  schedule fcfs   First Come First Served
+  schedule sjf    Shortest Job First
+  schedule srtf   Shortest Remaining Time First
+
+MEMORY MANAGEMENT:
+  alloc <size>    Allocate memory (in MB)
+  free            Free allocated memory
+
+CONCURRENCY:
+  race demo       Demonstrate race condition
+  lock enable     Enable synchronization
+
+OTHER:
+  clear           Clear the terminal
+  help            Show this help message`;
 
   return {
     success: true,

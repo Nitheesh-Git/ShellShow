@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useCallback } from 'react';
 import { createInitialFileSystem, getPathString } from '../utils/fileSystem';
-import { executeCommand } from '../utils/commandParser';
+import { executeCommand, resetOSState } from '../utils/commandParser';
 import { lessons, getLesson } from '../data/lessons';
 
 const AppContext = createContext(null);
@@ -105,11 +105,12 @@ function appReducer(state, action) {
         currentAnimation: null,
       };
 
-    case 'ADVANCE_MESSAGE':
+    case 'ADVANCE_MESSAGE': {
       const currentLesson = getLesson(state.currentLessonId);
       const newMessageIndex = state.messageIndex + 1;
 
       if (currentLesson && newMessageIndex >= currentLesson.assistantMessages.length) {
+        // If this is the final lesson (isComplete: true), enter free mode
         if (currentLesson.isComplete) {
           return {
             ...state,
@@ -118,6 +119,33 @@ function appReducer(state, action) {
             lessonsCompleted: lessons.length,
           };
         }
+
+        // If this lesson has no expected command (transition lesson), auto-advance to next lesson
+        if (!currentLesson.expectedCommand) {
+          const nextLessonId = state.currentLessonId + 1;
+          const nextLesson = getLesson(nextLessonId);
+
+          if (!nextLesson) {
+            return {
+              ...state,
+              lessonPhase: 'success',
+              freeMode: true,
+              lessonsCompleted: lessons.length,
+            };
+          }
+
+          return {
+            ...state,
+            currentLessonId: nextLessonId,
+            lessonPhase: 'intro',
+            messageIndex: 0,
+            hintsShown: 0,
+            lessonsCompleted: state.currentLessonId,
+            assistantEmotion: nextLesson.assistantMessages[0]?.emotion || 'idle',
+          };
+        }
+
+        // Otherwise, wait for user to type the expected command
         return {
           ...state,
           lessonPhase: 'waiting',
@@ -130,6 +158,7 @@ function appReducer(state, action) {
         messageIndex: newMessageIndex,
         assistantEmotion: currentLesson?.assistantMessages[newMessageIndex]?.emotion || 'idle',
       };
+    }
 
     case 'SET_LESSON_PHASE':
       return {
@@ -197,6 +226,22 @@ function appReducer(state, action) {
         screen: 'learning',
       };
 
+    case 'JUMP_TO_LESSON': {
+      const targetLesson = getLesson(action.payload);
+      if (!targetLesson) return state;
+
+      return {
+        ...state,
+        currentLessonId: action.payload,
+        lessonPhase: 'intro',
+        messageIndex: 0,
+        hintsShown: 0,
+        lessonsCompleted: Math.max(state.lessonsCompleted, action.payload - 1),
+        assistantEmotion: targetLesson.assistantMessages[0]?.emotion || 'idle',
+        freeMode: false,
+      };
+    }
+
     default:
       return state;
   }
@@ -206,6 +251,7 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   const startLearning = useCallback(() => {
+    resetOSState(); // Reset OS state when starting
     dispatch({ type: 'START_LEARNING' });
   }, []);
 
@@ -258,7 +304,13 @@ export function AppProvider({ children }) {
   }, []);
 
   const resetProgress = useCallback(() => {
+    resetOSState(); // Reset OS state when restarting
     dispatch({ type: 'RESET_PROGRESS' });
+  }, []);
+
+  const jumpToLesson = useCallback((lessonId) => {
+    resetOSState(); // Reset OS state when jumping
+    dispatch({ type: 'JUMP_TO_LESSON', payload: lessonId });
   }, []);
 
   const value = {
@@ -278,6 +330,7 @@ export function AppProvider({ children }) {
       enterFreeMode,
       clearTerminal,
       resetProgress,
+      jumpToLesson,
     },
   };
 

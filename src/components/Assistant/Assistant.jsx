@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../../context/AppContext';
 import { getLesson, lessons } from '../../data/lessons';
-import { Lightbulb, ArrowRight, RotateCcw, Sparkles, ChevronRight, HelpCircle } from 'lucide-react';
+import { Lightbulb, ArrowRight, RotateCcw, Sparkles, ChevronRight, HelpCircle, ChevronDown, SkipForward } from 'lucide-react';
 
 // SVG Cartoon Character - Shellie the Shell
 const ShellieCharacter = ({ emotion = 'idle' }) => {
@@ -257,6 +257,9 @@ const SpeechBubble = ({ message, highlight, onContinue, showContinue }) => {
     );
   };
 
+  // Show "Let's try it!" when there's a command to type
+  const buttonText = highlight ? "Let's try it!" : "Continue";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.9 }}
@@ -276,9 +279,13 @@ const SpeechBubble = ({ message, highlight, onContinue, showContinue }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           onClick={onContinue}
-          className="mt-3 flex items-center gap-1 text-xs text-[#cba6f7] hover:text-[#f5c2e7] transition-colors"
+          className={`mt-3 flex items-center gap-1 text-xs transition-colors ${
+            highlight
+              ? 'px-3 py-1.5 bg-[#a6e3a1]/20 text-[#a6e3a1] rounded-lg hover:bg-[#a6e3a1]/30 font-semibold'
+              : 'text-[#cba6f7] hover:text-[#f5c2e7]'
+          }`}
         >
-          Continue <ChevronRight className="w-3 h-3" />
+          {buttonText} <ChevronRight className="w-3 h-3" />
         </motion.button>
       )}
     </motion.div>
@@ -320,6 +327,84 @@ const ProgressTracker = ({ current, total, completed }) => (
   </div>
 );
 
+// Lesson Selector Dropdown
+const LessonSelector = ({ currentLessonId, onSelect }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Group lessons by category
+  const categories = {
+    basics: { name: 'File System Basics', lessons: [] },
+    process: { name: 'Process Management', lessons: [] },
+    scheduling: { name: 'CPU Scheduling', lessons: [] },
+    memory: { name: 'Memory Management', lessons: [] },
+    concurrency: { name: 'Concurrency', lessons: [] },
+    complete: { name: 'Completion', lessons: [] },
+  };
+
+  lessons.forEach(lesson => {
+    if (categories[lesson.category]) {
+      categories[lesson.category].lessons.push(lesson);
+    }
+  });
+
+  const handleSelect = (lessonId) => {
+    onSelect(lessonId);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative mb-4">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 bg-[#313244] border border-[#45475a] rounded-lg
+          text-[#cdd6f4] text-xs flex items-center justify-between gap-2
+          hover:bg-[#45475a] transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <SkipForward className="w-3 h-3 text-[#cba6f7]" />
+          <span>Jump to Lesson {currentLessonId}</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute z-50 w-full mt-1 bg-[#1e1e2e] border border-[#45475a]
+              rounded-lg shadow-xl max-h-64 overflow-y-auto"
+          >
+            {Object.entries(categories).map(([key, category]) => (
+              category.lessons.length > 0 && (
+                <div key={key}>
+                  <div className="px-3 py-1.5 bg-[#313244] text-[10px] font-semibold text-[#a6adc8] uppercase tracking-wider sticky top-0">
+                    {category.name}
+                  </div>
+                  {category.lessons.map(lesson => (
+                    <button
+                      key={lesson.id}
+                      onClick={() => handleSelect(lesson.id)}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-[#313244] transition-colors
+                        flex items-center gap-2 ${lesson.id === currentLessonId ? 'bg-[#cba6f7]/20 text-[#cba6f7]' : 'text-[#cdd6f4]'}`}
+                    >
+                      <span className="w-5 h-5 rounded-full bg-[#45475a] flex items-center justify-center text-[10px] font-mono">
+                        {lesson.id}
+                      </span>
+                      <span className="truncate">{lesson.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // Main Assistant Component
 export default function Assistant() {
   const { state, actions } = useApp();
@@ -332,11 +417,11 @@ export default function Assistant() {
   const isLastMessage = currentLesson && messageIndex >= currentLesson.assistantMessages.length - 1;
 
   const handleContinue = () => {
-    if (isLastMessage && !currentLesson.isComplete) {
-      actions.setLessonPhase('waiting');
-    } else {
-      actions.advanceMessage();
-    }
+    // Always use advanceMessage - the reducer handles all cases:
+    // - Final lessons (isComplete) → enter free mode
+    // - Transition lessons (no expectedCommand) → auto-advance to next lesson
+    // - Regular lessons → go to 'waiting' phase
+    actions.advanceMessage();
   };
 
   const handleHint = () => {
@@ -350,6 +435,12 @@ export default function Assistant() {
         current={currentLessonId}
         total={totalLessons}
         completed={lessonsCompleted}
+      />
+
+      {/* Lesson Selector */}
+      <LessonSelector
+        currentLessonId={currentLessonId}
+        onSelect={actions.jumpToLesson}
       />
 
       {/* Character */}
@@ -366,13 +457,13 @@ export default function Assistant() {
               message={currentMessage.text}
               highlight={currentMessage.highlight}
               onContinue={handleContinue}
-              showContinue={lessonPhase === 'intro' && !isLastMessage}
+              showContinue={lessonPhase === 'intro'}
             />
           )}
         </AnimatePresence>
 
-        {/* Waiting for input state */}
-        {lessonPhase === 'waiting' && currentLesson && (
+        {/* Waiting for input state - only show when there's an expected command */}
+        {(lessonPhase === 'waiting' || lessonPhase === 'hint') && currentLesson && currentLesson.expectedCommand && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -445,7 +536,7 @@ export default function Assistant() {
 
       {/* Action buttons */}
       <div className="flex-shrink-0 mt-4 space-y-2">
-        {lessonPhase === 'waiting' && currentLesson?.hints && hintsShown < currentLesson.hints.length && (
+        {(lessonPhase === 'waiting' || lessonPhase === 'hint') && currentLesson?.hints && hintsShown < currentLesson.hints.length && (
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
