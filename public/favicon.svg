@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="shellGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cba6f7"/>
+      <stop offset="50%" stop-color="#f5c2e7"/>
+      <stop offset="100%" stop-color="#fab387"/>
+    </linearGradient>
+  </defs>
+  <!-- Shell body -->
+  <ellipse cx="50" cy="55" rx="40" ry="35" fill="url(#shellGrad)"/>
+  <!-- Spiral pattern -->
+  <path d="M 50 35 Q 70 40 65 55 Q 60 70 45 68 Q 30 65 35 52 Q 40 42 55 48"
+        fill="none" stroke="#f5c2e7" stroke-width="3" opacity="0.7"/>
+  <!-- Terminal cursor -->
+  <rect x="38" y="70" width="24" height="4" fill="#a6e3a1" rx="2">
+    <animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/>
+  </rect>
+</svg>
