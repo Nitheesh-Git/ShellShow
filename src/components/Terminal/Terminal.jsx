@@ -71,7 +71,7 @@ export default function Terminal() {
     actions.executeCmd(trimmedInput);
 
     // Check if command matches expected command in lesson
-    if (!freeMode && currentLesson && lessonPhase === 'waiting') {
+    if (!freeMode && currentLesson && (lessonPhase === 'waiting' || lessonPhase === 'hint')) {
       const expected = currentLesson.expectedCommand;
       const normalizedInput = trimmedInput.toLowerCase().replace(/\s+/g, ' ');
       const normalizedExpected = expected?.toLowerCase().replace(/\s+/g, ' ');

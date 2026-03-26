@@ -1,0 +1,52 @@
+==============================================================
+SHELLSHOW - INTERACTIVE GUIDED MINI LINUX SHELL
+==============================================================
+
+PROJECT DESCRIPTION:
+An Operating Systems project implementing an interactive guided mini Linux shell with a visual learning assistant.
+
+LIVE DEPLOYED PROJECT:
+https://shellshow.vercel.app/
+
+==============================================================
+1. HARDWARE REQUIREMENTS
+==============================================================
+- Processor: Any modern Dual-Core Processor (Intel i3/AMD Ryzen 3 or better)
+- RAM: 4GB minimum (8GB recommended for modern browser performance)
+- Storage Space: 250MB minimum available space
+
+==============================================================
+2. SOFTWARE REQUIREMENTS & PACKAGES
+==============================================================
+- Operating System: Windows, macOS, or Linux
+- Environment: Node.js (Version 18.0.0 or higher recommended)
+- Package Manager: npm (comes with Node.js) or Yarn
+- Web Browser: Any modern web browser (Google Chrome, Firefox, Edge, Safari)
+
+Key Dependencies and Frameworks used:
+- React (v19) - Core framework
+- Vite (v8) - Build tool and development server
+- Tailwind CSS (v4) - Styling
+- Framer Motion - Animations
+- Lucide React - Icons
+
+==============================================================
+3. STEP-BY-STEP RUNNING AND EXECUTION STEPS
+==============================================================
+Step 1: Extract the project archive (ZIP file) into a folder on your computer.
+
+Step 2: Open a Terminal or Command Prompt. Navigate to the extracted project folder.
+For example:
+cd path/to/ShellShow
+
+Step 3: Install all required project dependencies. Run the following command:
+npm install
+
+Step 4: Once the installation is complete, start the development server by running:
+npm run dev
+
+Step 5: Access the application. 
+The terminal will display a local server address (usually http://localhost:5173).
+Open your web browser and navigate to that URL to view and interact with the ShellShow application.
+
+Step 6: To stop the server at any time, press "Ctrl + C" in the terminal window.
